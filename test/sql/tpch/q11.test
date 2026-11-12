@@ -1,0 +1,24 @@
+# name: test/sql/tpch/q11.test
+# description: TPC-H q11 in SaneQL (examples/tpch/q11.sane, from github.com/neumannt/saneql, BSD-3)
+# group: [tpch]
+
+require saneql
+
+require tpch
+
+statement ok
+CALL dbgen(sf=0.01);
+
+statement ok
+SET current_dialect = 'saneql';
+
+query I
+let partsupp_germany := partsupp
+   .join(supplier, ps_suppkey=s_suppkey)
+   .join(nation.filter(n_name='GERMANY'), s_nationkey=n_nationkey),
+partsupp_germany
+.groupby(ps_partkey, {value:=sum(ps_supplycost * ps_availqty)})
+.filter(value>partsupp_germany.aggregate(sum(ps_supplycost*ps_availqty))*0.0001)
+.orderby(value.desc())
+----
+<FILE>:duckdb/extension/tpch/dbgen/answers/sf0.01/q11.csv

@@ -1,0 +1,22 @@
+# name: test/sql/tpch/q14.test
+# description: TPC-H q14 in SaneQL (examples/tpch/q14.sane, from github.com/neumannt/saneql, BSD-3)
+# group: [tpch]
+
+require saneql
+
+require tpch
+
+statement ok
+CALL dbgen(sf=0.01);
+
+statement ok
+SET current_dialect = 'saneql';
+
+query I
+let base:='1995-09-01'::date,
+lineitem
+.filter(l_shipdate >= base && l_shipdate < base + '1 month'::interval)
+.join(part, l_partkey=p_partkey)
+.aggregate(100.00*sum(case({p_type.like('PROMO%') => l_extendedprice * (1 - l_discount)}, else:=0)) / sum(l_extendedprice * (1 - l_discount)))
+----
+<FILE>:duckdb/extension/tpch/dbgen/answers/sf0.01/q14.csv

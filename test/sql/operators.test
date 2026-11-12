@@ -1,0 +1,82 @@
+# name: test/sql/operators.test
+# description: SaneQL operators used by TPC-H, individually and in orders that force subquery wrapping
+# group: [saneql]
+
+require saneql
+
+require tpch
+
+statement ok
+CALL dbgen(sf=0.01);
+
+statement ok
+SET current_dialect = 'saneql';
+
+# aggregate without groups
+query I
+lineitem.filter(l_quantity < 2).aggregate(count())
+----
+1207
+
+# groupby with a bound group key, filter after groupby (becomes a subquery), orderby
+query II
+lineitem.groupby({flag:=l_returnflag}, {n:=count()}).filter(n > 14900).orderby({n})
+----
+R	14902
+N	30397
+
+# orderby with desc() on a column and on an expression, named limit argument, project after orderby
+query II
+lineitem.groupby({l_returnflag}, {n:=count()}).orderby({(n * 2).desc()}, limit:=2).project({l_returnflag, n})
+----
+N	30397
+R	14902
+
+# map keeps existing columns. A reserved word works as a binding name (ColLabel), but reading it back goes through
+# DuckDB's column reference rules and needs quoting (see NOTES.md)
+query II
+lineitem.filter(l_orderkey = 1).map({order:=l_linenumber * 10}).project({l_linenumber, "order"}).orderby({l_linenumber.desc()}, limit:=2)
+----
+6	60
+5	50
+
+# a SaneQL pipeline is a SELECT body: usable inside SQL
+query I
+SELECT n FROM (lineitem.groupby({l_returnflag}, {n:=count()})) ORDER BY n LIMIT 1
+----
+14876
+
+# operator names are a closed set in the grammar, so an unknown one is a syntax error at that name
+statement error
+lineitem.frobnicate(1)
+----
+syntax error at or near "frobnicate"
+
+# join types, let bindings of all three kinds, SaneQL scalar forms
+query II
+let cutoff := 2,
+let big := lineitem.filter(l_quantity > 45),
+let cnt(key) := lineitem.filter(l_orderkey = key).aggregate(count()),
+orders
+.filter(o_orderkey < 10 && !o_orderkey.in({3, 4}))
+.join(big, o_orderkey = l_orderkey, type:=leftsemi)
+.map({n:=cnt(o_orderkey), prio:=case({o_orderpriority.like('1%') => 'urgent'}, else:='other')})
+.filter(n.between(cutoff, 10) || prio = 'urgent')
+.orderby({o_orderkey})
+.project({o_orderkey, n})
+----
+5	3
+7	7
+
+statement error
+lineitem.join(orders, l_orderkey = o_orderkey, type:=sideways)
+----
+SaneQL: unsupported join type 'sideways'
+
+statement error
+lineitem.filter()
+----
+SaneQL: filter requires a 'condition' argument
+
+statement ok
+RESET current_dialect;

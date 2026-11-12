@@ -1,0 +1,27 @@
+# name: test/sql/tpch/q22.test
+# description: TPC-H q22 in SaneQL (examples/tpch/q22.sane, from github.com/neumannt/saneql, BSD-3)
+# group: [tpch]
+
+require saneql
+
+require tpch
+
+statement ok
+CALL dbgen(sf=0.01);
+
+statement ok
+SET current_dialect = 'saneql';
+
+query I
+let avg_for_selected :=
+   customer
+   .filter(c_acctbal > 0.00 && c_phone.substr(1,2).in({'13', '31', '23', '29', '30', '18', '17'}))
+   .aggregate(avg(c_acctbal)),
+customer
+.map({cntrycode:=c_phone.substr(1,2)})
+.filter(cntrycode.in({'13', '31', '23', '29', '30', '18', '17'}) && c_acctbal > avg_for_selected)
+.join(orders, o_custkey=c_custkey, type:=leftanti)
+.groupby({cntrycode}, {numcust:=count(), totacctbal:=sum(c_acctbal)})
+.orderby({cntrycode})
+----
+<FILE>:duckdb/extension/tpch/dbgen/answers/sf0.01/q22.csv

@@ -1,0 +1,27 @@
+# name: test/sql/tpch/q09.test
+# description: TPC-H q09 in SaneQL (examples/tpch/q09.sane, from github.com/neumannt/saneql, BSD-3)
+# group: [tpch]
+
+require saneql
+
+require tpch
+
+statement ok
+CALL dbgen(sf=0.01);
+
+statement ok
+SET current_dialect = 'saneql';
+
+query I
+part
+.filter(p_name.like('%green%'))
+.join(lineitem, p_partkey=l_partkey)
+.join(supplier, s_suppkey=l_suppkey)
+.join(partsupp, ps_suppkey=l_suppkey && ps_partkey=l_partkey)
+.join(orders, o_orderkey=l_orderkey)
+.join(nation, s_nationkey=n_nationkey)
+.map({nation:=n_name, o_year:=o_orderdate.extract(year), amount:=l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity})
+.groupby({nation, o_year}, {sum_profit:=sum(amount)})
+.orderby({nation, o_year.desc()})
+----
+<FILE>:duckdb/extension/tpch/dbgen/answers/sf0.01/q09.csv

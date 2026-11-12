@@ -1,0 +1,26 @@
+# name: test/sql/tpch/q17.test
+# description: TPC-H q17 in SaneQL (examples/tpch/q17.sane, from github.com/neumannt/saneql, BSD-3)
+# group: [tpch]
+
+require saneql
+
+require tpch
+
+statement ok
+CALL dbgen(sf=0.01);
+
+statement ok
+SET current_dialect = 'saneql';
+
+# The SaneQL example stops at the filtered lineitems; add TPC-H's final aggregation
+query I
+SELECT sum(l_extendedprice) / 7.0 AS avg_yearly FROM (
+let avg_for_part(p_partkey) :=
+   lineitem.filter(l_partkey=p_partkey).aggregate(0.2*avg(l_quantity)),
+part
+.filter(p_brand = 'Brand#23' && p_container = 'MED BOX')
+.join(lineitem, p_partkey=l_partkey)
+.filter(l_quantity < avg_for_part(p_partkey))
+)
+----
+<FILE>:duckdb/extension/tpch/dbgen/answers/sf0.01/q17.csv

@@ -1,0 +1,25 @@
+# name: test/sql/tpch/q19.test
+# description: TPC-H q19 in SaneQL (examples/tpch/q19.sane, from github.com/neumannt/saneql, BSD-3)
+# group: [tpch]
+
+require saneql
+
+require tpch
+
+statement ok
+CALL dbgen(sf=0.01);
+
+statement ok
+SET current_dialect = 'saneql';
+
+query I
+lineitem
+.filter(l_shipmode.in({'AIR', 'AIR REG'}) && l_shipinstruct = 'DELIVER IN PERSON')
+.join(part, p_partkey=l_partkey)
+.filter(
+   (p_brand = 'Brand#12' && p_container.in({'SM CASE', 'SM BOX', 'SM PACK', 'SM PKG'}) && l_quantity.between(1,1+10) && p_size.between(1,5))
+|| (p_brand = 'Brand#23' && p_container.in({'MED BAG', 'MED BOX', 'MED PKG', 'MED PACK'}) && l_quantity.between(10,10+10) && p_size.between(1,10))
+|| (p_brand = 'Brand#34' && p_container.in({'LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'}) && l_quantity.between(20,20+10) && p_size.between(1,15)))
+.aggregate(sum(l_extendedprice* (1 - l_discount)))
+----
+<FILE>:duckdb/extension/tpch/dbgen/answers/sf0.01/q19.csv

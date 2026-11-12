@@ -1,0 +1,22 @@
+# name: test/sql/tpch/q13.test
+# description: TPC-H q13 in SaneQL (examples/tpch/q13.sane, from github.com/neumannt/saneql, BSD-3)
+# group: [tpch]
+
+require saneql
+
+require tpch
+
+statement ok
+CALL dbgen(sf=0.01);
+
+statement ok
+SET current_dialect = 'saneql';
+
+query I
+customer
+.join(orders.filter(!o_comment.like('%special%requests%')), c_custkey=o_custkey, type:=leftouter)
+.groupby({c_custkey}, {c_count:=count(o_orderkey)})
+.groupby({c_count}, {custdist:=count()})
+.orderby({custdist.desc(), c_count.desc()})
+----
+<FILE>:duckdb/extension/tpch/dbgen/answers/sf0.01/q13.csv

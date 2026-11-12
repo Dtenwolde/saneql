@@ -1,0 +1,20 @@
+# name: test/sql/tpch/q06.test
+# description: TPC-H q06 in SaneQL (examples/tpch/q06.sane, from github.com/neumannt/saneql, BSD-3)
+# group: [tpch]
+
+require saneql
+
+require tpch
+
+statement ok
+CALL dbgen(sf=0.01);
+
+statement ok
+SET current_dialect = 'saneql';
+
+query I
+lineitem
+.filter(l_shipdate >= '1994-01-01'::date && l_shipdate < '1994-01-01'::date + '1 year'::interval && l_discount.between(0.06 - 0.01, 0.06 + 0.01) && l_quantity<24)
+.aggregate(sum(l_extendedprice * l_discount))
+----
+<FILE>:duckdb/extension/tpch/dbgen/answers/sf0.01/q06.csv

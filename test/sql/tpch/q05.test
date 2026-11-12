@@ -1,0 +1,26 @@
+# name: test/sql/tpch/q05.test
+# description: TPC-H q05 in SaneQL (examples/tpch/q05.sane, from github.com/neumannt/saneql, BSD-3)
+# group: [tpch]
+
+require saneql
+
+require tpch
+
+statement ok
+CALL dbgen(sf=0.01);
+
+statement ok
+SET current_dialect = 'saneql';
+
+query I
+customer
+.join(orders.filter(o_orderdate >= '1994-01-01'::date && o_orderdate < '1994-01-01'::date + '1 year'::interval), c_custkey=o_custkey)
+.join(lineitem, l_orderkey=o_orderkey)
+.join(supplier, l_suppkey=s_suppkey && c_nationkey=s_nationkey)
+.join(nation, s_nationkey=n_nationkey)
+.join(region.filter(r_name='ASIA'), n_regionkey=r_regionkey)
+.groupby({n_name}, {revenue:=sum(l_extendedprice * (1 - l_discount))})
+.orderby({revenue.desc()})
+.project({n_name, revenue})
+----
+<FILE>:duckdb/extension/tpch/dbgen/answers/sf0.01/q05.csv
